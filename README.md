@@ -1,2 +1,2 @@
 # Microservice_userService
-Microservice Project
+This service is for storing data of hotels
