@@ -1,5 +1,6 @@
 package com.Iwcd.user.service.services.impl;
 
+import com.Iwcd.user.service.entities.Hotel;
 import com.Iwcd.user.service.entities.Rating;
 import com.Iwcd.user.service.entities.User;
 import com.Iwcd.user.service.exceptions.ResourceNotFoundException;
@@ -8,12 +9,15 @@ import com.Iwcd.user.service.services.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -48,10 +52,25 @@ public class UserServiceImpl implements UserService {
         User user= userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("user with given id is not found on server!! : "+userId));
         //fetch rating of the above user from RATING SERVICE
         //http://localhost:8083/ratings/users/362ca759-afff-4dd0-b3ea-255c01d71daa
-        ArrayList<Rating> ratingsOfUser= restTemplate.getForObject("http://localhost:8083/ratings/users/"+user.getUserId(), ArrayList.class);
+        Rating[] ratingsOfUser= restTemplate.getForObject("http://RATING-SERVICE/ratings/users/"+user.getUserId(), Rating[].class);
         logger.info("{}",ratingsOfUser);
 
-        user.setRatings(ratingsOfUser);
+        List<Rating> ratings = Arrays.stream(ratingsOfUser).toList();
+
+        List<Rating> ratingList= ratings.stream().map(rating -> {
+            //api call to hotel service to get the hotel
+            //http://localhost:8082/hotels/ba8f1c60-5569-45a9-82d7-399b3287050f
+            ResponseEntity<Hotel> forEntity = restTemplate.getForEntity("http://HOTEL-SERVICE/hotels/"+rating.getHotelId(), Hotel.class);
+            Hotel hotel = forEntity.getBody();
+            logger.info("response status code: {} ",forEntity.getStatusCode());
+
+            //set the hotel to rating
+            rating.setHotel(hotel);
+            //return the rating
+            return rating;
+        }).collect(Collectors.toList());
+
+        user.setRatings(ratingList);
 
         return user;
     }
